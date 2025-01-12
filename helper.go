@@ -6,7 +6,7 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
-func GetOTP(secret string) (string, error) {
+func getOTP(secret string) (string, error) {
 	if len(secret) == 0 {
 		return "", nil
 	}

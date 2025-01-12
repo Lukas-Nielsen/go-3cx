@@ -29,8 +29,8 @@ you need the FQDN of the instanz, username and password (with permissions for th
 // conf
 c, err := threecs.NewClient(threecx.ClientConfig{
 	FQDN: "company.my3cx.com", // required
-	Port: 443, // can beomited, defaults to 443
-	User: "admin",
+	Port: 443, // can be omited, defaults to 443
+	User: "admin", // required
 	Passwort: "super secret password", // required
 	MFA: "super secret token", // can be omited, if mfa is not enabled for the user
 	Debug: false, // can be omited
@@ -54,5 +54,5 @@ err := c.Delete(<uri>, <query params as map[string]string>)
 #### post, put, patch
 
 ```go
-err := c.<Post|Put|Get>(<uri>, <payload>, <query params as map[string]string>)
+err := c.<Post|Put|Patch>(<uri>, <payload>, <query params as map[string]string>)
 ```

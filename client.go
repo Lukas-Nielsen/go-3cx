@@ -67,15 +67,21 @@ func NewClient(config ClientConfig) (*Client, error) {
 
 	c.rest = resty.New().SetDebug(c.config.Debug).SetBaseURL(fmt.Sprintf("https://%s:%d", c.config.FQDN, c.config.Port))
 
-	MFA, _ := GetOTP(c.config.MFA)
+	MFA, _ := getOTP(c.config.MFA)
 
 	var res authResponse
 
-	resp, err := c.rest.R().SetResult(&res).SetBody(authRequest{
-		Username:     c.config.User,
-		Password:     c.config.Passwort,
-		SecurityCode: MFA,
-	}).Post("/webclient/api/Login/GetAccessToken")
+	resp, err := c.rest.
+		R().
+		SetResult(&res).
+		SetBody(
+			authRequest{
+				Username:     c.config.User,
+				Password:     c.config.Passwort,
+				SecurityCode: MFA,
+			},
+		).
+		Post("/webclient/api/Login/GetAccessToken")
 
 	if err != nil {
 		return &Client{}, err
@@ -87,7 +93,15 @@ func NewClient(config ClientConfig) (*Client, error) {
 
 	c.token = res.Token
 
-	c.rest.SetAuthToken(c.token.AccessToken).SetBaseURL(fmt.Sprintf("https://%s:%d/xapi/v1", c.config.FQDN, c.config.Port))
+	c.rest.
+		SetAuthToken(c.token.AccessToken).
+		SetBaseURL(
+			fmt.Sprintf(
+				"https://%s:%d/xapi/v1",
+				c.config.FQDN,
+				c.config.Port,
+			),
+		)
 
 	return &c, nil
 }
