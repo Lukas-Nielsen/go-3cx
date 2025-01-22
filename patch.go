@@ -3,8 +3,9 @@ package threecx
 import "fmt"
 
 func (c *Client) Patch(uri string, payload any, query map[string]string) error {
-	resp, err := c.rest.
+	resp, err := c.client.
 		R().
+		SetAuthToken(c.token.AccessToken).
 		SetQueryParams(query).
 		SetBody(payload).
 		Patch(uri)

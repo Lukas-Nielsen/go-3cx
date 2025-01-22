@@ -26,15 +26,13 @@ import threecx "github.com/Lukas-Nielsen/go-3cx"
 you need the FQDN of the instanz, username and password (with permissions for the action)
 
 ```go
-// conf
-c, err := threecs.NewClient(threecx.ClientConfig{
-	FQDN: "company.my3cx.com", // required
-	Port: 443, // can be omited, defaults to 443
-	User: "admin", // required
-	Passwort: "super secret password", // required
-	MFA: "super secret token", // can be omited, if mfa is not enabled for the user
-	Debug: false, // can be omited
-})
+client, err := new threecx.NewClient(threecx.Host{FQDN string, Port int, Debug bool});
+
+client.SetUser(threecx.User{Username string, Password string, MFA string});
+// or
+client.SetRest(Rest{ClientID string, ClientSecret string});
+// or
+client.SetToken(Token{TokenType string, Expires int, AccessToken string, RefreshToken string});
 ```
 
 ### functions

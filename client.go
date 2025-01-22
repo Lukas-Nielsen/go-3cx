@@ -7,18 +7,38 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
-type ClientConfig struct {
+type Host struct {
 	// 3cx FQDN
 	FQDN string
 	// 3cx port
-	Port     int
-	User     string
-	Passwort string
-	// MFA client secret
-	MFA string
+	Port int
 	// debug the requests (see https://github.com/go-resty/resty)
 	Debug bool
-	Token Token
+}
+
+type Token struct {
+	// normaly Bearer
+	TokenType string `json:"token_type"`
+	// unix timestamp when token expires
+	Expires      int64  `json:"expires_in"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type User struct {
+	// username
+	Username string
+	// password
+	Password string
+	// mfa secret
+	MFA string
+}
+
+type Rest struct {
+	// clietn id
+	ClientID string
+	// client secret
+	ClientSecret string
 }
 
 type authRequest struct {
@@ -33,94 +53,99 @@ type authResponse struct {
 	TwoFactorAuth any    `json:"TwoFactorAuth"`
 }
 
-type Token struct {
-	TokenType    string `json:"token_type"`
-	Expires      int64  `json:"expires_in"` // unix timestamp when token expires
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-}
-
 type Client struct {
-	config    ClientConfig
+	host      Host
 	token     Token
-	rest      *resty.Client
+	user      User
+	rest      Rest
+	client    *resty.Client
 	tokenAuth bool
 }
 
-func NewClient(config ClientConfig) (*Client, error) {
+func NewClient(host Host) (*Client, error) {
 	c := Client{
-		config: config,
+		host: host,
 	}
 
-	if c.config.Port == 0 {
-		c.config.Port = 443
+	c = *c.setup()
+
+	return &c, nil
+}
+
+func (c *Client) SetHost(host Host) (*Client, error) {
+	c.host = host
+
+	return c.setup(), nil
+}
+
+func (c *Client) SetUser(user User) (*Client, error) {
+	c.user = user
+	MFA, _ := getOTP(c.user.MFA)
+
+	var res authResponse
+
+	resp, err := c.client.
+		R().
+		SetResult(&res).
+		SetBody(
+			authRequest{
+				Username:     c.user.Username,
+				Password:     c.user.Password,
+				SecurityCode: MFA,
+			},
+		).
+		Post("/webclient/api/Login/GetAccessToken")
+
+	if err != nil {
+		return &Client{}, err
 	}
 
-	if len(c.config.FQDN) == 0 {
-		return &Client{}, fmt.Errorf("%s", "missing FQDN")
+	if resp.IsError() {
+		return &Client{}, fmt.Errorf("%s", "error during login")
 	}
 
-	if len(c.config.Token.TokenType) == 0 ||
-		len(c.config.Token.AccessToken) == 0 ||
-		len(c.config.Token.RefreshToken) == 0 ||
-		c.config.Token.Expires == 0 {
+	c.token = res.Token
+	c.token.Expires = time.Now().Unix() + res.Token.Expires*60*1000
+	return c, nil
+}
 
-		if len(c.config.User) == 0 {
-			return &Client{}, fmt.Errorf("%s", "missing User")
-		}
+func (c *Client) SetRest(rest Rest) (*Client, error) {
+	c.rest = rest
 
-		if len(c.config.Passwort) == 0 {
-			return &Client{}, fmt.Errorf("%s", "missing Password")
-		}
-	} else {
-		c.tokenAuth = true
+	var res authResponse
+
+	resp, err := c.client.
+		R().
+		SetResult(&res).
+		SetFormData(
+			map[string]string{
+				"client_id":     c.rest.ClientID,
+				"client_secret": c.rest.ClientSecret,
+				"grant_type":    "client_credentials",
+			},
+		).
+		Post("/connect/token")
+
+	if err != nil {
+		return &Client{}, err
 	}
 
-	c.rest = resty.
-		New().
-		SetDebug(c.config.Debug).
-		SetBaseURL(
-			fmt.Sprintf(
-				"https://%s:%d",
-				c.config.FQDN,
-				c.config.Port,
-			),
-		)
-
-	MFA, _ := getOTP(c.config.MFA)
-
-	if !c.tokenAuth {
-		var res authResponse
-
-		resp, err := c.rest.
-			R().
-			SetResult(&res).
-			SetBody(
-				authRequest{
-					Username:     c.config.User,
-					Password:     c.config.Passwort,
-					SecurityCode: MFA,
-				},
-			).
-			Post("/webclient/api/Login/GetAccessToken")
-
-		if err != nil {
-			return &Client{}, err
-		}
-
-		if resp.IsError() {
-			return &Client{}, fmt.Errorf("%s", "error during login")
-		}
-
-		c.token = res.Token
-		c.token.Expires = time.Now().Unix() + res.Token.Expires*60*1000
-	} else {
-		c.token = c.config.Token
+	if resp.IsError() {
+		return &Client{}, fmt.Errorf("%s", "error during client_credentials login")
 	}
 
+	c.token = res.Token
+	c.token.Expires = time.Now().Unix() + res.Token.Expires*60*1000
+	return c, nil
+}
+
+func (c *Client) SetToken(token Token) (*Client, error) {
+	c.token = token
 	if c.token.Expires < time.Now().Unix() {
+
 		var res authResponse
-		resp, err := c.rest.
+
+		resp, err := c.client.
 			R().
 			SetResult(&res).
 			SetFormData(
@@ -143,16 +168,19 @@ func NewClient(config ClientConfig) (*Client, error) {
 		c.token = res.Token
 		c.token.Expires = time.Now().Unix() + res.Token.Expires*60*1000
 	}
+	return c, nil
+}
 
-	c.rest.
-		SetAuthToken(c.token.AccessToken).
+func (c *Client) setup() *Client {
+	c.client = resty.
+		New().
+		SetDebug(c.host.Debug).
 		SetBaseURL(
 			fmt.Sprintf(
-				"https://%s:%d/xapi/v1",
-				c.config.FQDN,
-				c.config.Port,
+				"https://%s:%d",
+				c.host.FQDN,
+				c.host.Port,
 			),
 		)
-
-	return &c, nil
+	return c
 }
