@@ -2,7 +2,7 @@ package threecx
 
 import "fmt"
 
-func (c *Client) Get(uri string, result *any, query map[string]string) error {
+func (c *Client) Get(uri string, result any, query map[string]string) error {
 	resp, err := c.client.
 		R().
 		SetAuthToken(c.token.AccessToken).

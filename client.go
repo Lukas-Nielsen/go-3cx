@@ -112,7 +112,7 @@ func (c *Client) SetUser(user User) (*Client, error) {
 func (c *Client) SetRest(rest Rest) (*Client, error) {
 	c.rest = rest
 
-	var res authResponse
+	var res Token
 
 	resp, err := c.client.
 		R().
@@ -134,15 +134,14 @@ func (c *Client) SetRest(rest Rest) (*Client, error) {
 		return &Client{}, fmt.Errorf("%s", "error during client_credentials login")
 	}
 
-	c.token = res.Token
-	c.token.Expires = time.Now().Unix() + res.Token.Expires*60*1000
+	c.token = res
+	c.token.Expires = time.Now().Unix() + res.Expires*60*1000
 	return c, nil
 }
 
 func (c *Client) SetToken(token Token) (*Client, error) {
 	c.token = token
 	if c.token.Expires < time.Now().Unix() {
-
 		var res authResponse
 
 		resp, err := c.client.
