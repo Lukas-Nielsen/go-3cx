@@ -35,7 +35,7 @@ type User struct {
 }
 
 type Rest struct {
-	// clietn id
+	// client id
 	ClientID string
 	// client secret
 	ClientSecret string
@@ -54,12 +54,11 @@ type authResponse struct {
 }
 
 type Client struct {
-	host      Host
-	token     Token
-	user      User
-	rest      Rest
-	client    *resty.Client
-	tokenAuth bool
+	host   Host
+	token  Token
+	user   User
+	rest   Rest
+	client *resty.Client
 }
 
 func NewClient(host Host) (*Client, error) {
