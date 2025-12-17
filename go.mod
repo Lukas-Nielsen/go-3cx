@@ -1,6 +1,6 @@
 module github.com/Lukas-Nielsen/go-3cx
 
-go 1.23.4
+go 1.25.0
 
 require (
 	github.com/go-resty/resty/v2 v2.16.3

@@ -1,4 +1,4 @@
-package threecx
+package tcx
 
 import (
 	"errors"

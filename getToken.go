@@ -1,4 +1,4 @@
-package threecx
+package tcx
 
 func (c *Client) GetToken() Token {
 	return c.token
